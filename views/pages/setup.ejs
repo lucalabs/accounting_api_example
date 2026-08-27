@@ -1,0 +1,55 @@
+<%
+  const host = luca.normalizeHost(credentials.host);
+  const configured = Boolean(credentials.clientId && credentials.clientSecret);
+%>
+<div class="card">
+  <h2>Your API credentials</h2>
+  <p class="hint">
+    From the OAuth application you registered in Luca. They are sent to Luca by this server,
+    never from your browser, and are kept in memory only — restarting the server forgets them.
+  </p>
+
+  <form method="post" action="/setup">
+    <div class="field">
+      <label for="host">Host</label>
+      <input id="host" name="host" value="<%= host %>" spellcheck="false">
+    </div>
+
+    <div class="field">
+      <label for="clientId">Client ID</label>
+      <input id="clientId" name="clientId" value="<%= credentials.clientId %>" spellcheck="false"
+             autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000">
+    </div>
+
+    <div class="field">
+      <label for="clientSecret">Client secret</label>
+      <input id="clientSecret" name="clientSecret" type="password" spellcheck="false"
+             autocomplete="off"
+             placeholder="<%= credentials.clientSecret ? "•".repeat(24) + " (saved)" : "your client secret" %>">
+    </div>
+
+    <div class="actions" style="margin-top: 16px;">
+      <button class="btn" type="submit">Save and continue</button>
+      <% if (configured) { %>
+        <button class="btn danger" type="submit" formaction="/setup/forget">Forget</button>
+      <% } %>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Register this with Luca</h2>
+  <p class="hint">Your OAuth application in Luca needs to allow the redirect URI below, exactly.</p>
+
+  <dl class="kv">
+    <dt>Redirect URI</dt>
+    <dd><code><%= redirectUri %></code></dd>
+    <dt>Scope requested</dt>
+    <dd><code><%= luca.SCOPE %></code></dd>
+  </dl>
+
+  <p class="hint" style="margin: 18px 0 0;">
+    Testing against a local instance? Set the host to <code>http://localhost:3000</code> — a plain
+    <code>http://</code> address avoids certificate trouble.
+  </p>
+</div>

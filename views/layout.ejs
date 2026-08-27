@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title><%= title %> · Luca API example</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="wrap<%= wide ? " wide" : "" %>">
+    <header class="page">
+      <h1>Luca API example</h1>
+      <p>Connect with OAuth2 and query the accounting API — the whole flow, end to end.</p>
+    </header>
+
+    <%- include("partials/nav") %>
+    <%- include("partials/flash") %>
+    <%- include(page) %>
+  </div>
+</body>
+</html>

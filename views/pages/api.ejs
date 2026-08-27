@@ -1,0 +1,53 @@
+<div class="req-bar">
+  <span class="method">POST</span>
+  <code class="req-url"><%= luca.normalizeHost(credentials.host) + luca.GRAPHQL_PATH %></code>
+</div>
+
+<div class="api-layout">
+  <div class="api-main">
+    <div class="card pane">
+      <div class="pane-head">
+        <h2>Query</h2>
+        <button class="btn" type="submit" form="request">Send</button>
+      </div>
+
+      <form method="post" action="/api/query" id="request">
+        <input type="hidden" name="q" value="<%= search %>">
+        <textarea name="query" rows="14" spellcheck="false" class="code"><%= query %></textarea>
+
+        <details class="vars" <%= variables.trim() ? "open" : "" %>>
+          <summary>Variables <span class="muted">(JSON)</span></summary>
+          <textarea name="variables" rows="5" spellcheck="false" class="code"
+                    placeholder='{ "id": "123" }'><%= variables %></textarea>
+        </details>
+
+        <details class="vars">
+          <summary>Headers <span class="muted">(sent for you)</span></summary>
+          <dl class="kv headers">
+            <% for (const [name, value] of Object.entries(luca.headersFor(token.access_token))) { %>
+              <dt><%= name %></dt>
+              <dd><code><%= name === "Authorization" ? "Bearer " + token.access_token.slice(0, 24) + "…" : value %></code></dd>
+            <% } %>
+          </dl>
+        </details>
+      </form>
+    </div>
+
+    <div class="card pane">
+      <div class="pane-head">
+        <h2>Response</h2>
+        <% if (result) { %>
+          <span class="badge <%= result.ok ? "ok" : "bad" %>"><%= result.label %></span>
+        <% } %>
+      </div>
+
+      <% if (result) { %>
+        <pre class="code"><%- highlight.json(result.body) %></pre>
+      <% } else { %>
+        <p class="empty">Send the request to see the response here.</p>
+      <% } %>
+    </div>
+  </div>
+
+  <%- include("../partials/schema") %>
+</div>

@@ -1,0 +1,20 @@
+{
+  "name": "luca-api-example",
+  "version": "1.0.0",
+  "description": "An Express example of the Luca accounting API: the OAuth2 authorization-code flow, and a GraphQL explorer",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.0.0",
+    "ejs": "^3.1.10",
+    "express": "^5.0.0",
+    "express-session": "^1.18.0"
+  }
+}

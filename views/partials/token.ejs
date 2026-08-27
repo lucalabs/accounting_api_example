@@ -1,0 +1,32 @@
+<% const timing = tokenTiming(token); %>
+<div class="card">
+  <h2><span class="step">Step 2</span>Access token</h2>
+  <p class="hint">The authorization code was exchanged server-side for these tokens.</p>
+
+  <dl class="kv">
+    <dt>Granted scope</dt>
+    <dd><code><%= grantedScope || luca.SCOPE %></code></dd>
+    <dt>Token type</dt>
+    <dd><code><%= token.token_type %></code></dd>
+    <dt>Issued via</dt>
+    <dd><code><%= token.grant_type %></code> at <%= formatTime(timing.obtainedAt) %></dd>
+    <dt>Expires</dt>
+    <dd>
+      <%= formatTime(timing.expiresAt) %>
+      (<%= token.expires_in %>s after issue<%= timing.expired ? " — expired" : "" %>)
+    </dd>
+    <dt>Refreshes</dt>
+    <dd><%= token.refresh_count %> since connecting</dd>
+  </dl>
+
+  <p class="hint" style="margin: 18px 0 6px;">Access token (JWT)</p>
+  <pre><%= token.access_token %></pre>
+  <p class="hint" style="margin: 0 0 6px;">Refresh token</p>
+  <pre><%= token.refresh_token %></pre>
+
+  <form method="post" action="/oauth/disconnect">
+    <div class="actions">
+      <button class="btn danger" type="submit">Disconnect</button>
+    </div>
+  </form>
+</div>

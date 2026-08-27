@@ -1,0 +1,56 @@
+<% const state = new URLSearchParams({ refresh: "1", q: search, query, variables }); %>
+
+<aside class="card sidebar">
+  <div class="pane-head">
+    <h2>Schema</h2>
+    <a class="link-quiet" href="/api?<%= state %>" title="Fetch the schema again">Reload</a>
+  </div>
+
+  <% if (schemaError) { %>
+    <p class="empty">Could not read the schema.</p>
+    <p class="hint"><%= schemaError %></p>
+  <% } else { %>
+    <form method="get" action="/api" class="search">
+      <input type="hidden" name="query" value="<%= query %>">
+      <input type="hidden" name="variables" value="<%= variables %>">
+      <input type="search" name="q" value="<%= search %>" placeholder="Search fields…"
+             spellcheck="false" autocomplete="off">
+    </form>
+
+    <% const groups = [
+         { label: "Queries", fields: filtered.queries },
+         { label: "Mutations", fields: filtered.mutations },
+       ]; %>
+
+    <% if (!groups.some((g) => g.fields.length)) { %>
+      <p class="empty">Nothing matches “<%= search %>”.</p>
+    <% } %>
+
+    <% for (const group of groups) { %>
+      <% if (group.fields.length) { %>
+        <details open>
+          <summary><%= group.label %> <span class="muted"><%= group.fields.length %></span></summary>
+
+          <ul class="schema">
+            <% for (const field of group.fields) { %>
+              <li>
+                <div class="sig">
+                  <a class="try" href="/api?field=<%= encodeURIComponent(field.name) %><%= search ? "&q=" + encodeURIComponent(search) : "" %>">Try it</a>
+                  <code><span class="t-field"><%= field.name %></span><%
+                    if (!field.args.length) { %><span class="t-punc">()</span><%
+                    } else if (field.args.length === 1) { %><span class="t-punc">(</span><span class="t-arg"><%= field.args[0].name %></span><span class="t-punc">: </span><span class="t-type"><%= field.args[0].type %></span><span class="t-punc">)</span><%
+                    } else { %><span class="t-punc">(</span><% for (const arg of field.args) { %>
+  <span class="t-arg"><%= arg.name %></span><span class="t-punc">: </span><span class="t-type"><%= arg.type %></span><% } %>
+<span class="t-punc">)</span><% } %><span class="t-punc">: </span><span class="t-type"><%= field.returns %></span></code>
+                </div>
+                <% if (field.description) { %>
+                  <p class="sig-desc"><%= field.description %></p>
+                <% } %>
+              </li>
+            <% } %>
+          </ul>
+        </details>
+      <% } %>
+    <% } %>
+  <% } %>
+</aside>

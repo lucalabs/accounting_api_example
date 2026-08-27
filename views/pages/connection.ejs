@@ -1,0 +1,59 @@
+<% if (!token) { %>
+
+  <div class="card">
+    <h2><span class="step">Step 1</span>Grant access</h2>
+    <p class="hint">
+      Sends you to Luca to sign in and pick the company this integration may read. On approval
+      Luca redirects back here with a single-use authorization code, which this server swaps for
+      an access token.
+    </p>
+
+    <dl class="kv">
+      <dt>Host</dt>
+      <dd><code><%= luca.normalizeHost(credentials.host) %></code></dd>
+      <dt>Client ID</dt>
+      <dd><code><%= credentials.clientId %></code></dd>
+    </dl>
+
+    <div class="actions" style="margin-top: 18px;">
+      <a class="btn" href="/oauth/authorize">Connect to Luca</a>
+      <a class="btn secondary" href="/setup">Change credentials</a>
+    </div>
+  </div>
+
+<% } else { %>
+
+  <%- include("../partials/token") %>
+
+  <div class="card">
+    <h2><span class="step">Step 3</span>Refresh the token</h2>
+    <p class="hint">
+      Calls <code>POST <%= luca.normalizeHost(credentials.host) + luca.TOKEN_PATH %></code> with
+      <code>grant_type=refresh_token</code> — a pure server-to-server call with no browser session
+      behind it. Both tokens above should change.
+    </p>
+
+    <% const timing = tokenTiming(token); %>
+    <form method="post" action="/oauth/refresh">
+      <div class="actions">
+        <button class="btn" type="submit">Refresh token</button>
+        <span class="hint" style="margin: 0;">
+          <% if (timing.expired) { %>
+            The access token has expired — refresh to get a working one.
+          <% } else { %>
+            Access token expires in <%= humanizeSeconds(timing.secondsLeft) %>.
+          <% } %>
+        </span>
+      </div>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">Step 4</span>Use it</h2>
+    <p class="hint">The token works. Go and call the API with it.</p>
+    <div class="actions">
+      <a class="btn" href="/api">Explore the API</a>
+    </div>
+  </div>
+
+<% } %>

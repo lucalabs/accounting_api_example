@@ -1,0 +1,14 @@
+<nav class="nav">
+  <a class="tab <%= path === "/setup" ? "active" : "" %>" href="/setup">1 · Setup</a>
+  <a class="tab <%= path === "/" ? "active" : "" %>" href="/">2 · Connection</a>
+
+  <% if (token) { %>
+    <a class="tab <%= path === "/api" ? "active" : "" %>" href="/api">3 · API</a>
+  <% } else { %>
+    <span class="tab disabled" title="Connect first">3 · API</span>
+  <% } %>
+
+  <span class="nav-status">
+    <span class="pill <%= token ? "on" : "off" %>"><%= token ? "Connected" : "Not connected" %></span>
+  </span>
+</nav>
