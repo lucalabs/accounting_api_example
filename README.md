@@ -63,10 +63,11 @@ Each file does one thing, so you can read them in the order the flow happens.
 | `src/logger.js` | Prints every call to Luca, with secrets redacted |
 | `src/guards.js` | Sends you to the page that fixes the problem |
 | `src/flash.js` | One-shot messages between redirects |
-| `src/view-helpers.js` | Time formatting for the templates |
+| `src/view-helpers.js` | Time formatting, and type names linked to their docs |
 | `views/layout.ejs` | The shell and navigation, used by every page |
 | `views/pages/*.ejs` | One file per page |
-| `views/partials/*.ejs` | Nav, flash, token card, schema listing |
+| `views/partials/*.ejs` | Nav, flash, token card, schema listing, type docs |
+| `public/complete.js` | Autocomplete for the query editor — the only client-side code |
 | `public/style.css` | The whole look |
 
 Start with `src/luca.js` if you only care about the API calls, or `src/routes/oauth.js` if you want
@@ -131,9 +132,33 @@ any field loads a runnable example into the editor. Fields with required argumen
 query with `$variables`, and the Variables panel opens prefilled with the names to supply — so the
 example passes GraphQL validation and the only thing left to do is type a real value.
 
-All of it is server-rendered: search is a `GET` with `?q=`, and **Try it** is a link. The page ships
-no JavaScript at all. Introspection needs a valid access token, and the result is cached per host
-for your session — **Reload** fetches it again.
+Introspection needs a valid access token, and the result is cached per host for your session —
+**Reload** fetches it again.
+
+### Reading the schema
+
+Every type name in the sidebar is a link. Following one replaces the field list with that type's
+own documentation — its fields and their types, an input object's fields, an enum's values, a
+union's members, an interface's implementors — and each of *those* type names is a link too, so you
+can walk from `companies` down to the shape of a single line on an invoice without leaving the page.
+**← All fields** goes back. Whatever is in the editor travels along in the URL, so reading the docs
+never costs you the query you were writing.
+
+This is the same information a `__schema` query returns, laid out one type at a time: `src/schema.js`
+asks for it once, and `views/partials/type-doc.ejs` renders it.
+
+### Autocomplete
+
+Typing a field name in the editor offers the fields that are actually valid at the cursor, with the
+type each one returns and the first line of its description. Arrow keys move, `Enter` or `Tab`
+accepts, `Esc` dismisses, and `Ctrl-Space` asks for the full list without typing anything first.
+
+`public/complete.js` is the only client-side code in the project, and nothing depends on it: the
+editor is a plain `<textarea>` in a form that posts to the server, so with JavaScript off you type
+field names yourself and every other part of the page — search, **Try it**, the type docs, sending
+the query — still works, because all of them are links and form posts. It reads the schema from
+`GET /api/schema.json` and works out the enclosing type by tracking braces rather than parsing, which
+is enough for ordinary queries and gives up on fragments, directives and inline spreads.
 
 ## Two things worth knowing about the API
 

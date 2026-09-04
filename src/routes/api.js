@@ -20,6 +20,17 @@ router.get("/api", requireToken, async (req, res) => {
   });
 });
 
+// What the editor's autocomplete reads. Served separately rather than inlined
+// into the page so a large schema is fetched once, in the background, and the
+// editor keeps working if it never arrives.
+router.get("/api/schema.json", requireToken, async (req, res) => {
+  const { schema, schemaError } = await load(req);
+
+  if (!schema) return res.status(502).json({ error: schemaError });
+
+  res.json(schemas.outline(schema));
+});
+
 router.post("/api/query", requireToken, async (req, res) => {
   const state = await load(req);
   const query = req.body.query || luca.DEFAULT_QUERY;
@@ -88,7 +99,13 @@ async function load(req) {
     schemaError = luca.describeError(error);
   }
 
-  return { schema, filtered: schema && schemas.filter(schema, search), search, schemaError };
+  return {
+    schema,
+    filtered: schema && schemas.filter(schema, search),
+    type: schemas.findType(schema, req.query.type ?? req.body?.type),
+    search,
+    schemaError,
+  };
 }
 
 function render(res, locals) {
@@ -97,6 +114,7 @@ function render(res, locals) {
     title: "API",
     wide: true,
     result: null,
+    type: null,
     highlight,
     ...locals,
   });
