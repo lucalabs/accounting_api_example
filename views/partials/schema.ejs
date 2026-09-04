@@ -1,14 +1,41 @@
-<% const state = new URLSearchParams({ refresh: "1", q: search, query, variables }); %>
+<%
+  // Every link out of the sidebar carries the editor's contents with it, so
+  // reading the docs never costs you the query you were writing.
+  const linkState = { q: search, query, variables };
+
+  // A null drops the parameter rather than sending the word "null" — which is
+  // how "Try it" asks for a generated example instead of keeping the editor.
+  const href = (extra) => {
+    const params = new URLSearchParams();
+
+    for (const [key, value] of Object.entries({ ...linkState, ...extra })) {
+      if (value !== null && value !== undefined) params.set(key, value);
+    }
+
+    return `/api?${params}`;
+  };
+
+  const ref = (item) =>
+    typeRef({
+      rendered: item.returns ?? item.type,
+      typeName: item.typeName,
+      linkable: Boolean(schema && schema.types.has(item.typeName)),
+      state: linkState,
+    });
+%>
 
 <aside class="card sidebar">
   <div class="pane-head">
     <h2>Schema</h2>
-    <a class="link-quiet" href="/api?<%= state %>" title="Fetch the schema again">Reload</a>
+    <a class="link-quiet" href="<%= href({ refresh: "1", type: type ? type.name : "" }) %>"
+       title="Fetch the schema again">Reload</a>
   </div>
 
   <% if (schemaError) { %>
     <p class="empty">Could not read the schema.</p>
     <p class="hint"><%= schemaError %></p>
+  <% } else if (type) { %>
+    <%- include("type-doc", { type, ref, href }) %>
   <% } else { %>
     <form method="get" action="/api" class="search">
       <input type="hidden" name="query" value="<%= query %>">
@@ -35,13 +62,8 @@
             <% for (const field of group.fields) { %>
               <li>
                 <div class="sig">
-                  <a class="try" href="/api?field=<%= encodeURIComponent(field.name) %><%= search ? "&q=" + encodeURIComponent(search) : "" %>">Try it</a>
-                  <code><span class="t-field"><%= field.name %></span><%
-                    if (!field.args.length) { %><span class="t-punc">()</span><%
-                    } else if (field.args.length === 1) { %><span class="t-punc">(</span><span class="t-arg"><%= field.args[0].name %></span><span class="t-punc">: </span><span class="t-type"><%= field.args[0].type %></span><span class="t-punc">)</span><%
-                    } else { %><span class="t-punc">(</span><% for (const arg of field.args) { %>
-  <span class="t-arg"><%= arg.name %></span><span class="t-punc">: </span><span class="t-type"><%= arg.type %></span><% } %>
-<span class="t-punc">)</span><% } %><span class="t-punc">: </span><span class="t-type"><%= field.returns %></span></code>
+                  <a class="try" href="<%= href({ field: field.name, query: null, variables: null }) %>">Try it</a>
+                  <%- include("signature", { field, ref }) %>
                 </div>
                 <% if (field.description) { %>
                   <p class="sig-desc"><%= field.description %></p>

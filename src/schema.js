@@ -18,11 +18,22 @@ export const INTROSPECTION_QUERY = `
         fields(includeDeprecated: false) {
           name
           description
-          args { name type { ...Ref } }
+          args { ...Input }
           type { ...Ref }
         }
+        inputFields { ...Input }
+        enumValues(includeDeprecated: false) { name description }
+        interfaces { ...Ref }
+        possibleTypes { ...Ref }
       }
     }
+  }
+
+  fragment Input on __InputValue {
+    name
+    description
+    defaultValue
+    type { ...Ref }
   }
 
   fragment Ref on __Type {
@@ -70,20 +81,46 @@ export function summarize(introspected) {
   const types = new Map(
     introspected.types
       .filter((type) => type.name && !type.name.startsWith("__"))
-      .map((type) => [type.name, { ...type, fields: (type.fields ?? []).map(distillField) }]),
+      .map((type) => [type.name, distillType(type)]),
   );
 
+  const roots = {
+    query: introspected.queryType?.name ?? null,
+    mutation: introspected.mutationType?.name ?? null,
+  };
+
   return {
-    queries: fieldsOf(introspected.queryType, types, "query"),
-    mutations: fieldsOf(introspected.mutationType, types, "mutation"),
+    roots,
+    queries: fieldsOf(roots.query, types, "query"),
+    mutations: fieldsOf(roots.mutation, types, "mutation"),
     types,
   };
 }
 
-function fieldsOf(root, types, operation) {
-  if (!root) return [];
+// One shape for every kind of type, so a template can ask any of them for its
+// fields without checking what it is first. Only one or two of these lists are
+// ever filled in: objects have `fields`, inputs have `inputFields`, enums have
+// `enumValues`, unions have `possibleTypes`, and scalars have none of them.
+function distillType(type) {
+  return {
+    kind: type.kind,
+    name: type.name,
+    description: type.description ?? "",
+    fields: (type.fields ?? []).map(distillField),
+    inputFields: (type.inputFields ?? []).map(distillInput),
+    enumValues: (type.enumValues ?? []).map((value) => ({
+      name: value.name,
+      description: value.description ?? "",
+    })),
+    interfaces: (type.interfaces ?? []).map(unwrap).filter(Boolean),
+    possibleTypes: (type.possibleTypes ?? []).map(unwrap).filter(Boolean),
+  };
+}
 
-  return (types.get(root.name)?.fields ?? [])
+function fieldsOf(rootName, types, operation) {
+  if (!rootName) return [];
+
+  return (types.get(rootName)?.fields ?? [])
     .map((field) => ({ ...field, operation }))
     .sort(byName);
 }
@@ -93,12 +130,22 @@ function distillField(field) {
     name: field.name,
     description: field.description ?? "",
     returns: render(field.type),
-    args: (field.args ?? []).map((arg) => ({
-      name: arg.name,
-      type: render(arg.type),
-      required: arg.type?.kind === "NON_NULL",
-    })),
+    args: (field.args ?? []).map(distillInput),
     typeName: unwrap(field.type),
+  };
+}
+
+// An argument and an input-object field are both `__InputValue` in the schema,
+// so one function covers the arguments in a signature and the fields you fill
+// in to build a mutation's input.
+function distillInput(input) {
+  return {
+    name: input.name,
+    description: input.description ?? "",
+    type: render(input.type),
+    required: input.type?.kind === "NON_NULL",
+    defaultValue: input.defaultValue ?? null,
+    typeName: unwrap(input.type),
   };
 }
 
@@ -205,6 +252,42 @@ export function find(schema, name) {
   if (!schema || !name) return null;
 
   return [...schema.queries, ...schema.mutations].find((field) => field.name === name) ?? null;
+}
+
+export function findType(schema, name) {
+  if (!schema || !name) return null;
+
+  return schema.types.get(name) ?? null;
+}
+
+// The trimmed-down schema the editor's autocomplete needs in the browser: for
+// every type, the fields you can write inside it and the type each one leads
+// to. That is enough to answer "what is valid where the cursor is?" without
+// shipping a GraphQL parser. Descriptions are cut to a single line — the full
+// ones are one click away in the sidebar.
+const HINT_LENGTH = 90;
+
+export function outline(schema) {
+  const types = {};
+
+  for (const [name, type] of schema.types) {
+    if (!type.fields.length) continue;
+
+    types[name] = type.fields.map((field) => ({
+      name: field.name,
+      type: field.typeName,
+      returns: field.returns,
+      hint: shorten(field.description),
+    }));
+  }
+
+  return { roots: schema.roots, types };
+}
+
+function shorten(text) {
+  const line = text.replace(/\s+/g, " ").trim();
+
+  return line.length > HINT_LENGTH ? `${line.slice(0, HINT_LENGTH - 1)}…` : line;
 }
 
 const byName = (a, b) => a.name.localeCompare(b.name);

@@ -13,7 +13,9 @@
 
       <form method="post" action="/api/query" id="request">
         <input type="hidden" name="q" value="<%= search %>">
-        <textarea name="query" rows="14" spellcheck="false" class="code"><%= query %></textarea>
+        <input type="hidden" name="type" value="<%= type ? type.name : "" %>">
+        <textarea name="query" id="query" rows="14" spellcheck="false" class="code"
+                  data-complete="/api/schema.json"><%= query %></textarea>
 
         <details class="vars" <%= variables.trim() ? "open" : "" %>>
           <summary>Variables <span class="muted">(JSON)</span></summary>
@@ -51,3 +53,5 @@
 
   <%- include("../partials/schema") %>
 </div>
+
+<script src="/complete.js" defer></script>

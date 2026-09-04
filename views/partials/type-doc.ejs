@@ -1,0 +1,89 @@
+<%
+  // Everything one type has to say. Which of these sections has anything in it
+  // depends on what kind of type it is — an object has fields, an input has
+  // input fields, an enum has values, a union has members — so each one is
+  // skipped when empty rather than special-cased by kind.
+  const sections = [
+    { label: "Fields", items: type.fields },
+    { label: "Input fields", items: type.inputFields },
+  ].filter((section) => section.items.length);
+
+  const empty =
+    !sections.length && !type.enumValues.length && !type.possibleTypes.length;
+%>
+
+<div class="type-doc">
+  <a class="link-quiet back" href="<%= href({ type: null }) %>">← All fields</a>
+
+  <div class="type-head">
+    <span class="kind"><%= type.kind.toLowerCase().replace("_", " ") %></span>
+    <code class="t-type"><%= type.name %></code>
+  </div>
+
+  <% if (type.description) { %>
+    <p class="type-desc"><%= type.description %></p>
+  <% } %>
+
+  <% if (type.interfaces.length) { %>
+    <p class="type-desc">
+      Implements
+      <% for (const name of type.interfaces) { %>
+        <code><a class="t-link" href="<%= href({ type: name }) %>"><%= name %></a></code>
+      <% } %>
+    </p>
+  <% } %>
+
+  <% for (const section of sections) { %>
+    <h3 class="type-section"><%= section.label %> <span class="muted"><%= section.items.length %></span></h3>
+
+    <ul class="schema">
+      <% for (const item of section.items) { %>
+        <li>
+          <div class="sig"><%- include("signature", { field: item, ref }) %></div>
+          <% if (item.defaultValue !== null && item.defaultValue !== undefined) { %>
+            <p class="sig-desc">Defaults to <code><%= item.defaultValue %></code></p>
+          <% } %>
+          <% if (item.description) { %>
+            <p class="sig-desc"><%= item.description %></p>
+          <% } %>
+        </li>
+      <% } %>
+    </ul>
+  <% } %>
+
+  <% if (type.enumValues.length) { %>
+    <h3 class="type-section">Values <span class="muted"><%= type.enumValues.length %></span></h3>
+
+    <ul class="schema">
+      <% for (const value of type.enumValues) { %>
+        <li>
+          <div class="sig"><code class="t-literal"><%= value.name %></code></div>
+          <% if (value.description) { %>
+            <p class="sig-desc"><%= value.description %></p>
+          <% } %>
+        </li>
+      <% } %>
+    </ul>
+  <% } %>
+
+  <% if (type.possibleTypes.length) { %>
+    <h3 class="type-section">Possible types <span class="muted"><%= type.possibleTypes.length %></span></h3>
+
+    <ul class="schema">
+      <% for (const name of type.possibleTypes) { %>
+        <li>
+          <div class="sig">
+            <code><a class="t-link t-type" href="<%= href({ type: name }) %>"><%= name %></a></code>
+          </div>
+        </li>
+      <% } %>
+    </ul>
+  <% } %>
+
+  <% if (empty) { %>
+    <p class="empty">
+      <code><%= type.name %></code> is a <%= type.kind.toLowerCase().replace("_", " ") %> —
+      it has no fields of its own.
+    </p>
+  <% } %>
+</div>

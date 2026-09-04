@@ -1,0 +1,11 @@
+<%
+  // One field, the way it reads in the schema: `name(arg: Type): Return`.
+  // Argument lists go on their own lines once there is more than one, and
+  // every type name is a link into its own documentation.
+  const args = field.args ?? [];
+%><code><span class="t-field"><%= field.name %></span><%
+  if (args.length === 1) { %><span class="t-punc">(</span><span class="t-arg"><%= args[0].name %></span><span class="t-punc">: </span><%- ref(args[0]) %><span class="t-punc">)</span><%
+  } else if (args.length) { %><span class="t-punc">(</span><% for (const arg of args) { %>
+  <span class="t-arg"><%= arg.name %></span><span class="t-punc">: </span><%- ref(arg) %><% } %>
+<span class="t-punc">)</span><% }
+%><span class="t-punc">: </span><%- ref(field) %></code>
