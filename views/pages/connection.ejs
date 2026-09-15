@@ -3,16 +3,25 @@
   <div class="card">
     <h2><span class="step">Step 1</span>Grant access</h2>
     <p class="hint">
-      Sends you to Luca to sign in and pick the company this integration may read. On approval
-      Luca redirects back here with a single-use authorization code, which this server swaps for
-      an access token.
+      Sends you to Luca to sign in and tick which of your companies this integration may reach —
+      it can be more than one. On approval Luca redirects back here with a single-use authorization
+      code, which this server swaps for an access token.
+    </p>
+    <p class="hint">
+      The request carries a <code>state</code> value and a PKCE <code>code_challenge</code>. The
+      matching <code>code_verifier</code> stays on this server: only its SHA-256 hash travels through
+      your browser, so intercepting the code is not enough to spend it.
     </p>
 
     <dl class="kv">
-      <dt>Host</dt>
-      <dd><code><%= luca.normalizeHost(credentials.host) %></code></dd>
+      <dt>Authorization endpoint</dt>
+      <dd><code><%= metadata.authorizeEndpoint %></code></dd>
       <dt>Client ID</dt>
       <dd><code><%= credentials.clientId %></code></dd>
+      <dt>Client type</dt>
+      <dd><code><%= publicClient ? "public (PKCE only)" : "confidential" %></code></dd>
+      <dt>Scope requested</dt>
+      <dd><code><%= credentials.scope %></code></dd>
     </dl>
 
     <div class="actions" style="margin-top: 18px;">
@@ -28,9 +37,10 @@
   <div class="card">
     <h2><span class="step">Step 3</span>Refresh the token</h2>
     <p class="hint">
-      Calls <code>POST <%= luca.normalizeHost(credentials.host) + luca.TOKEN_PATH %></code> with
+      Calls <code>POST <%= metadata.tokenEndpoint %></code> with
       <code>grant_type=refresh_token</code> — a pure server-to-server call with no browser session
-      behind it. Both tokens above should change.
+      behind it. Both tokens above should change: refresh tokens rotate, and the one you just used
+      stops working the moment a new one is issued.
     </p>
 
     <% const timing = tokenTiming(token); %>

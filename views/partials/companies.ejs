@@ -1,0 +1,24 @@
+<%
+  // The companies this token was granted. Deliberately here and not in the
+  // request bar: the company is a property of each *field*, not of the request,
+  // and a selector up there would teach the opposite.
+%>
+<div class="companies">
+  <p class="hint">
+    <% if (companiesError) { %>
+      Could not list the companies this token reaches. <%= companiesError %>
+    <% } else if (!companies.length) { %>
+      This token reaches no companies.
+    <% } else { %>
+      Your consent covers these. Every query and mutation names one with
+      <code>companyId</code> — <strong>Try it</strong> fills in the one you pick.
+      Either the id or the organisation number works.
+    <% } %>
+  </p>
+
+  <% for (const option of companies) { %>
+    <a class="pill <%= company && company.id === option.id ? "on" : "off" %>"
+       href="<%= href({ company: option.id, pick: "1" }) %>"
+       title="<%= option.organisationNumber %> · <%= option.id %>"><%= option.name %></a>
+  <% } %>
+</div>

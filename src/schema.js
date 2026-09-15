@@ -1,10 +1,34 @@
-// GraphQL introspection: asking the Luca API to describe itself.
+// What this token can see: the API's own description of itself, and the
+// companies the token may reach.
 //
 // Every GraphQL API answers a special `__schema` query listing its own types
 // and fields, which is where the sidebar on the API page comes from — nothing
 // about Luca's schema is hardcoded here.
+//
+// The companies live here too rather than in a file of their own. Both are
+// answers to "what does this access token open?", both are fetched with it,
+// and both stop being true the moment the grant behind it changes — so they
+// share one cache, one lifetime and one place to forget.
 
-import { graphql } from "./luca.js";
+import { DEFAULT_QUERY, explain, graphql } from "./luca.js";
+
+// The argument every root field takes, naming which of the authorized
+// companies that field is about. It accepts a company id or an organisation
+// number.
+export const COMPANY_ARG = "companyId";
+
+// The only two fields that do not need one, because their job is to tell a
+// client which companies it may reach — they cannot themselves demand the
+// answer. Both accept `companyId` like everything else; they just do not
+// require it. This is a property of the grant rather than of the schema, which
+// is why it is two names written down here and not something introspection can
+// be asked for.
+const COMPANY_FIELDS = new Set(["companies", "company"]);
+
+// The query the app runs to learn which companies a token reaches — the very
+// same one sitting in the editor when the API page opens, so pressing Send
+// shows you the app's own homework.
+export const COMPANIES_QUERY = DEFAULT_QUERY;
 
 export const INTROSPECTION_QUERY = `
   query IntrospectionQuery {
@@ -43,32 +67,56 @@ export const INTROSPECTION_QUERY = `
   }
 `;
 
-// Keyed by session as well as host: what introspection returns depends on the
-// grant behind the token, so one session must never be served another's schema.
+// Keyed by session as well as host: what introspection returns — and which
+// companies come back — depends on the grant behind the token, so one session
+// must never be served another's answers.
 const cache = new Map();
 const MAX_ENTRIES = 20;
 
-const keyFor = (sessionId, host) => `${sessionId}\u0000${host}`;
+const keyFor = (sessionId, host, kind) => `${sessionId}\u0000${host}\u0000${kind}`;
 
+// Drops both halves, so the Reload link on the API page and a reconnect in
+// src/routes/oauth.js each get a clean slate.
 export function forget(sessionId, host) {
-  cache.delete(keyFor(sessionId, host));
+  for (const kind of ["schema", "companies"]) cache.delete(keyFor(sessionId, host, kind));
 }
 
 export async function load({ sessionId, host, accessToken }) {
-  const key = keyFor(sessionId, host);
+  const key = keyFor(sessionId, host, "schema");
   if (cache.has(key)) return cache.get(key);
 
-  const { body } = await graphql({ host, accessToken, query: INTROSPECTION_QUERY });
+  const { status, body } = await graphql({ host, accessToken, query: INTROSPECTION_QUERY });
 
-  if (body.errors) {
-    const [first] = body.errors;
-    throw new Error(first?.message ?? "Introspection was refused by the API.");
-  }
+  if (body.errors || body.error) throw refusal(status, body, "Introspection was refused by the API.");
 
   const schema = summarize(body.data.__schema);
   remember(key, schema);
 
   return schema;
+}
+
+// The companies this token may name. Fetched with the same token, cached
+// beside the schema, and thrown away with it.
+export async function loadCompanies({ sessionId, host, accessToken }) {
+  const key = keyFor(sessionId, host, "companies");
+  if (cache.has(key)) return cache.get(key);
+
+  const { status, body } = await graphql({ host, accessToken, query: COMPANIES_QUERY });
+
+  if (body.errors || body.error) throw refusal(status, body, "The API refused to list companies.");
+
+  const companies = body.data?.companies?.nodes ?? [];
+  remember(key, companies);
+
+  return companies;
+}
+
+// `explain` turns the API's own rules into a sentence worth reading; without
+// it a 401 surfaces here as the bare word "Unauthorized".
+function refusal(status, body, fallback) {
+  const [first] = body.errors ?? [];
+
+  return new Error(explain({ status, body }) ?? first?.message ?? body.error ?? fallback);
 }
 
 function remember(key, schema) {
@@ -138,6 +186,10 @@ function distillField(field) {
 // An argument and an input-object field are both `__InputValue` in the schema,
 // so one function covers the arguments in a signature and the fields you fill
 // in to build a mutation's input.
+//
+// `required` here means *required by the schema* — a NON_NULL type, which
+// GraphQL itself will not let you leave out. It is not the only way an
+// argument can be mandatory: see needsCompany below.
 function distillInput(input) {
   return {
     name: input.name,
@@ -161,11 +213,36 @@ function unwrap(type) {
   return type?.name ? type.name : type?.ofType ? unwrap(type.ofType) : null;
 }
 
-// A runnable example for one field. Required arguments become $variables
-// rather than literals, because GraphQL rejects a null for a NON_NULL argument
-// outright — a literal would fail validation before Luca ever saw it.
-export function starterQuery(field, types) {
-  const args = field.args.filter((arg) => arg.required);
+// Does this field need a `companyId` even though the schema says it is
+// optional? The schema declares it nullable on purpose — a personal API key is
+// bound to one company and may leave it out — but an OAuth access token
+// reaches several, so for one of those it is required at run time on every
+// field but the two exempt ones.
+export function needsCompany(field) {
+  return !COMPANY_FIELDS.has(field.name) && field.args.some((arg) => arg.name === COMPANY_ARG);
+}
+
+// The arguments a generated example should fill in, and the single place the
+// query and its variables agree on that list. Two different kinds of required
+// meet here: NON_NULL, which GraphQL enforces, and `companyId`, which the
+// access token enforces.
+export function exampleArgs(field) {
+  const required = field.args.filter((arg) => arg.required && arg.name !== COMPANY_ARG);
+  const company = needsCompany(field) ? field.args.filter((arg) => arg.name === COMPANY_ARG) : [];
+
+  return [...company, ...required];
+}
+
+// A runnable example for one field. Arguments become $variables rather than
+// literals: GraphQL rejects a null for a NON_NULL argument outright, so a
+// literal would fail validation before Luca ever saw it.
+//
+// `companyId` is declared in the example exactly as the schema declares it —
+// `$companyId: ID`, nullable — and filled in with a real company. That it
+// passes validation either way, and is enforced later by the token, is the
+// whole shape of the new model in one line.
+export function starterQuery(field, types, { companyId } = {}) {
+  const args = exampleArgs(field);
   const call = args.length ? `(${args.map((arg) => `${arg.name}: $${arg.name}`).join(", ")})` : "";
   const params = args.length ? ` (${args.map((arg) => `$${arg.name}: ${arg.type}`).join(", ")})` : "";
 
@@ -175,15 +252,72 @@ export function starterQuery(field, types) {
   return `${header}{\n  ${field.name}${call}${selection(field.typeName, types, 2, 1)}\n}`;
 }
 
-export function starterVariables(field) {
-  const args = field.args.filter((arg) => arg.required);
+export function starterVariables(field, { companyId } = {}) {
+  const args = exampleArgs(field);
   if (!args.length) return "";
 
   return JSON.stringify(
-    Object.fromEntries(args.map((arg) => [arg.name, placeholder(arg.type)])),
+    Object.fromEntries(
+      args.map((arg) => [
+        arg.name,
+        arg.name === COMPANY_ARG ? (companyId ?? "") : placeholder(arg.type),
+      ]),
+    ),
     null,
     2,
   );
+}
+
+// Swapping the company in the variables the editor already holds, so picking a
+// different one does not throw away the query you were writing. A JSON body
+// without a `companyId` is handed back untouched.
+export function applyCompany(variablesJson, companyId) {
+  const text = String(variablesJson ?? "");
+  if (!text.trim()) return text;
+
+  try {
+    const parsed = JSON.parse(text);
+    if (!Object.hasOwn(parsed, COMPANY_ARG)) return text;
+
+    return JSON.stringify({ ...parsed, [COMPANY_ARG]: companyId }, null, 2);
+  } catch {
+    return text;
+  }
+}
+
+// The one thing the new model makes possible that the old one did not: because
+// the company is named per field and not per request, a single document can
+// ask about several at once.
+//
+// Literals rather than $variables here, deliberately — the point is to see two
+// different ids side by side. Two selections of the same field also need
+// aliases to coexist, so the example teaches that in passing.
+export function everyCompanyQuery(field, types, companies) {
+  const body = companies
+    .map((company, index) => {
+      const call = `(${COMPANY_ARG}: ${JSON.stringify(company.id)})`;
+
+      return `  ${aliasFor(company, index, companies)}: ${field.name}${call}${selection(field.typeName, types, 2, 1)}`;
+    })
+    .join("\n");
+
+  return `${field.operation === "mutation" ? "mutation " : ""}{\n${body}\n}`;
+}
+
+// An organisation number cannot be an alias — GraphQL names may not start with
+// a digit — so this works from the company name, and gives up on a positional
+// name when that leaves nothing usable or duplicated.
+function aliasFor(company, index, companies) {
+  const cleaned = String(company.name ?? "")
+    .replace(/[^A-Za-z0-9_]/g, "")
+    .replace(/^[0-9]+/, "");
+  const unique = cleaned && companies.filter((other) => sameAlias(other, cleaned)).length === 1;
+
+  return unique ? cleaned.slice(0, 40) : `company${index + 1}`;
+}
+
+function sameAlias(company, cleaned) {
+  return String(company.name ?? "").replace(/[^A-Za-z0-9_]/g, "").replace(/^[0-9]+/, "") === cleaned;
 }
 
 function placeholder(type) {
@@ -205,6 +339,10 @@ function placeholder(type) {
 
 // Luca's list fields are connection-shaped, so stepping into `nodes` is what
 // turns an example into one that returns something.
+//
+// Unaffected by `companyId`: this only ever walks *into* a field's own type,
+// never across the root, and everything below a root field is already scoped by
+// the company that field named.
 const WORTH_EXPANDING = new Set(["nodes", "edges", "node"]);
 const MAX_FIELDS = 6;
 

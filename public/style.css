@@ -113,6 +113,9 @@ pre {
 .flash.notice { border-color: color-mix(in srgb, var(--ok) 40%, transparent); background: color-mix(in srgb, var(--ok) 10%, transparent); color: var(--ok); }
 .flash.alert  { border-color: color-mix(in srgb, var(--err) 40%, transparent); background: color-mix(in srgb, var(--err) 10%, transparent); color: var(--err); }
 
+.choice { display: block; font-size: 14px; margin: 0 0 6px; cursor: pointer; }
+.choice input { margin-right: 8px; }
+
 .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
 .pill.on { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
 .pill.off { background: var(--panel-2); color: var(--muted); }

@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
 
-import { DEFAULT_HOST } from "./luca.js";
+import { DEFAULT_HOST, DEFAULT_SCOPE } from "./luca.js";
 
 export const config = {
   port: Number(process.env.PORT) || 8080,
@@ -16,7 +16,11 @@ export const config = {
 const fromEnv = {
   host: process.env.HOST || DEFAULT_HOST,
   clientId: process.env.CLIENT_ID || "",
+  // Blank is a valid answer: an application registered as a public client has
+  // no secret, and PKCE is what proves the exchange came from whoever started
+  // the flow.
   clientSecret: process.env.CLIENT_SECRET || "",
+  scope: process.env.SCOPE || DEFAULT_SCOPE,
 };
 
 export function credentialsFor(session) {
@@ -26,11 +30,13 @@ export function credentialsFor(session) {
     host: saved.host ?? fromEnv.host,
     clientId: saved.clientId ?? fromEnv.clientId,
     clientSecret: saved.clientSecret ?? fromEnv.clientSecret,
+    scope: saved.scope ?? fromEnv.scope,
   };
 }
 
-// Must match a redirect URI registered on your Luca OAuth application, so it is
-// derived once here and used by both /oauth/authorize and /oauth/callback.
+// Must match a redirect URI registered on your Luca OAuth application — Luca
+// compares them character for character — so it is derived once here and used
+// by both /oauth/authorize and /oauth/callback.
 export function redirectUriFor(req) {
   if (config.redirectUri) return config.redirectUri;
 

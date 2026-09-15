@@ -1,6 +1,7 @@
 <%
   const host = luca.normalizeHost(credentials.host);
-  const configured = Boolean(credentials.clientId && credentials.clientSecret);
+  const configured = Boolean(credentials.clientId);
+  const wantsWrite = luca.grants(credentials.scope, luca.SCOPES.write);
 %>
 <div class="card">
   <h2>Your API credentials</h2>
@@ -22,10 +23,48 @@
     </div>
 
     <div class="field">
+      <label>Client type</label>
+      <div>
+        <label class="choice">
+          <input type="radio" name="clientType" value="confidential" <%= publicClient ? "" : "checked" %>>
+          Confidential — keeps a secret on a server
+        </label>
+        <label class="choice">
+          <input type="radio" name="clientType" value="public" <%= publicClient ? "checked" : "" %>>
+          Public — no secret, PKCE only
+        </label>
+        <p class="hint" style="margin: 6px 0 0;">
+          OAuth 2.1 allows a client with no secret at all: PKCE, not the secret, is what proves the
+          token exchange came from whoever started the flow. A mobile or single-page app cannot keep
+          a secret, so it registers as public.
+        </p>
+      </div>
+    </div>
+
+    <div class="field">
       <label for="clientSecret">Client secret</label>
       <input id="clientSecret" name="clientSecret" type="password" spellcheck="false"
              autocomplete="off"
-             placeholder="<%= credentials.clientSecret ? "•".repeat(24) + " (saved)" : "your client secret" %>">
+             placeholder="<%= credentials.clientSecret ? "•".repeat(24) + " (saved)" : "public client — leave blank" %>">
+    </div>
+
+    <div class="field">
+      <label>Scope</label>
+      <div>
+        <label class="choice">
+          <input type="radio" name="scope" value="read" <%= wantsWrite ? "" : "checked" %>>
+          <code><%= luca.SCOPES.read %></code> — read only
+        </label>
+        <label class="choice">
+          <input type="radio" name="scope" value="write" <%= wantsWrite ? "checked" : "" %>>
+          <code><%= luca.SCOPES.read %> <%= luca.SCOPES.write %></code> — also run mutations
+        </label>
+        <p class="hint" style="margin: 6px 0 0;">
+          Sent verbatim as <code>scope=</code>. You may only ask for the scopes your application is
+          registered for — asking for more is refused with <code>invalid_scope</code>. A token's scope
+          is fixed when it is granted, so changing this drops the current token.
+        </p>
+      </div>
     </div>
 
     <div class="actions" style="margin-top: 16px;">
@@ -38,14 +77,58 @@
 </div>
 
 <div class="card">
+  <div class="pane-head" style="padding: 0; border: 0;">
+    <h2>What this host says about itself</h2>
+    <a class="link-quiet" href="/setup?rediscover=1" title="Read the metadata document again">Re-read</a>
+  </div>
+  <p class="hint">
+    Nothing below is hardcoded. This app asks <code><%= host + discovery.METADATA_PATH %></code>
+    where to send you — the same thing any OAuth client should do, because the Luca codebase is served
+    under several brands on several hosts and each one names its own endpoints.
+  </p>
+
+  <% if (metadata.source === "fallback") { %>
+    <p class="hint" style="color: var(--err);">
+      Could not read that document, so the endpoints below are guessed from Luca's usual paths.
+      <br><%= metadata.error %>
+      <br><strong>A production client should fail here instead of guessing.</strong>
+    </p>
+  <% } else if (metadata.error) { %>
+    <p class="hint" style="color: var(--err);"><%= metadata.error %></p>
+  <% } %>
+
+  <dl class="kv">
+    <dt>Issuer</dt>
+    <dd><code><%= metadata.issuer %></code></dd>
+    <dt>Authorization endpoint</dt>
+    <dd><code><%= metadata.authorizeEndpoint %></code></dd>
+    <dt>Token endpoint</dt>
+    <dd><code><%= metadata.tokenEndpoint %></code></dd>
+    <dt>Revocation endpoint</dt>
+    <dd><code><%= metadata.revocationEndpoint %></code></dd>
+    <dt>Scopes offered</dt>
+    <dd><code><%= metadata.scopesSupported.join(" ") || "—" %></code></dd>
+    <dt>PKCE methods</dt>
+    <dd><code><%= metadata.codeChallengeMethods.join(" ") || "—" %></code></dd>
+    <dt>Client authentication</dt>
+    <dd><code><%= metadata.tokenAuthMethods.join(" ") || "—" %></code></dd>
+    <dt><code>iss</code> on callbacks</dt>
+    <dd><code><%= metadata.issParameterSupported === null ? "unknown" : metadata.issParameterSupported %></code></dd>
+  </dl>
+</div>
+
+<div class="card">
   <h2>Register this with Luca</h2>
-  <p class="hint">Your OAuth application in Luca needs to allow the redirect URI below, exactly.</p>
+  <p class="hint">
+    Your OAuth application in Luca needs to allow the redirect URI below, exactly — Luca compares it
+    character for character — and to be registered for the scope you are asking for.
+  </p>
 
   <dl class="kv">
     <dt>Redirect URI</dt>
     <dd><code><%= redirectUri %></code></dd>
     <dt>Scope requested</dt>
-    <dd><code><%= luca.SCOPE %></code></dd>
+    <dd><code><%= credentials.scope %></code></dd>
   </dl>
 
   <p class="hint" style="margin: 18px 0 0;">

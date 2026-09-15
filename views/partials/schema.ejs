@@ -1,7 +1,11 @@
 <%
   // Every link out of the sidebar carries the editor's contents with it, so
   // reading the docs never costs you the query you were writing.
-  const linkState = { q: search, query, variables };
+  //
+  // `company` rides along too, so the picked company survives a search or a
+  // walk through the type docs. It is only ever *rewritten* by the picker
+  // itself, which marks its links with pick=1.
+  const linkState = { q: search, query, variables, field, company: company ? company.id : "" };
 
   // A null drops the parameter rather than sending the word "null" — which is
   // how "Try it" asks for a generated example instead of keeping the editor.
@@ -34,12 +38,16 @@
   <% if (schemaError) { %>
     <p class="empty">Could not read the schema.</p>
     <p class="hint"><%= schemaError %></p>
+    <p class="hint"><a href="/oauth/authorize">Connect to Luca again</a></p>
   <% } else if (type) { %>
     <%- include("type-doc", { type, ref, href }) %>
   <% } else { %>
+    <%- include("companies", { companies, company, companiesError, href }) %>
+
     <form method="get" action="/api" class="search">
       <input type="hidden" name="query" value="<%= query %>">
       <input type="hidden" name="variables" value="<%= variables %>">
+      <input type="hidden" name="company" value="<%= company ? company.id : "" %>">
       <input type="search" name="q" value="<%= search %>" placeholder="Search fields…"
              spellcheck="false" autocomplete="off">
     </form>
@@ -53,10 +61,21 @@
       <p class="empty">Nothing matches “<%= search %>”.</p>
     <% } %>
 
+    <% const mayWrite = luca.grants(grantedScope, luca.SCOPES.write); %>
+
     <% for (const group of groups) { %>
       <% if (group.fields.length) { %>
-        <details open>
+        <% const muted = group.label === "Mutations" && !mayWrite; %>
+        <details <%= muted ? "" : "open" %>>
           <summary><%= group.label %> <span class="muted"><%= group.fields.length %></span></summary>
+
+          <% if (muted) { %>
+            <p class="hint">
+              This token was granted <code><%= luca.SCOPES.read %></code>. Every mutation below will
+              be refused — pick the wider scope on <a href="/setup">Setup</a> and connect again.
+              Running one anyway is a fine way to see what the refusal looks like.
+            </p>
+          <% } %>
 
           <ul class="schema">
             <% for (const field of group.fields) { %>

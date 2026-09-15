@@ -1,6 +1,16 @@
+<%
+  // The address comes from /.well-known/oauth-protected-resource, which is the
+  // document that says what this API is and who guards it. The hardcoded path
+  // is only the fallback.
+  const endpoint = (resource && resource.resource) || luca.normalizeHost(credentials.host) + luca.GRAPHQL_PATH;
+
+  // `all=1` regenerates the example as one document naming every company, so
+  // the query and variables are deliberately left behind.
+  const multiHref = `/api?${new URLSearchParams({ field, all: "1", q: search, company: company ? company.id : "" })}`;
+%>
 <div class="req-bar">
   <span class="method">POST</span>
-  <code class="req-url"><%= luca.normalizeHost(credentials.host) + luca.GRAPHQL_PATH %></code>
+  <code class="req-url"><%= endpoint %></code>
 </div>
 
 <div class="api-layout">
@@ -14,6 +24,8 @@
       <form method="post" action="/api/query" id="request">
         <input type="hidden" name="q" value="<%= search %>">
         <input type="hidden" name="type" value="<%= type ? type.name : "" %>">
+        <input type="hidden" name="company" value="<%= company ? company.id : "" %>">
+        <input type="hidden" name="field" value="<%= field %>">
         <textarea name="query" id="query" rows="14" spellcheck="false" class="code"
                   data-complete="/api/schema.json"><%= query %></textarea>
 
@@ -35,6 +47,14 @@
       </form>
     </div>
 
+    <% if (companies.length > 1 && field) { %>
+      <p class="hint" style="margin: -6px 0 14px;">
+        This token reaches <%= companies.length %> companies, and the company is named per field
+        rather than per request — so one document can
+        <a href="<%= multiHref %>">ask all of them at once</a>.
+      </p>
+    <% } %>
+
     <div class="card pane">
       <div class="pane-head">
         <h2>Response</h2>
@@ -43,6 +63,15 @@
         <% } %>
       </div>
 
+      <% if (result && result.explanation) { %>
+        <p class="hint" style="margin: 0 0 10px;"><%= result.explanation %></p>
+      <% } %>
+      <% if (result && result.challenge) { %>
+        <p class="hint" style="margin: 0 0 10px;">
+          The refusal came with <code>WWW-Authenticate: Bearer resource_metadata="<%= result.challenge %>"</code>
+          — enough for a client that has never seen this host to find the authorization server on its own.
+        </p>
+      <% } %>
       <% if (result) { %>
         <pre class="code"><%- highlight.json(result.body) %></pre>
       <% } else { %>

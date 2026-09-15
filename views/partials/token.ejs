@@ -5,7 +5,12 @@
 
   <dl class="kv">
     <dt>Granted scope</dt>
-    <dd><code><%= grantedScope || luca.SCOPE %></code></dd>
+    <dd>
+      <code><%= token.scope || "not reported" %></code>
+      <% if (!luca.grants(token.scope, luca.SCOPES.write)) { %>
+        <span class="hint" style="display: block; margin: 4px 0 0;">Read only — mutations will be refused.</span>
+      <% } %>
+    </dd>
     <dt>Token type</dt>
     <dd><code><%= token.token_type %></code></dd>
     <dt>Issued via</dt>
@@ -19,14 +24,24 @@
     <dd><%= token.refresh_count %> since connecting</dd>
   </dl>
 
-  <p class="hint" style="margin: 18px 0 6px;">Access token (JWT)</p>
+  <p class="hint" style="margin: 18px 0 6px;">
+    Access token (opaque) — there is nothing in here to decode, and that is the point: an opaque
+    token can be revoked the instant a user withdraws access, and tells a client nothing it has no
+    business reading. Ask the introspection endpoint if you need to know what one carries.
+  </p>
   <pre><%= token.access_token %></pre>
-  <p class="hint" style="margin: 0 0 6px;">Refresh token</p>
+  <p class="hint" style="margin: 0 0 6px;">
+    Refresh token — single use. Store the new one after every refresh; presenting a spent one is
+    treated as theft and revokes the whole authorization.
+  </p>
   <pre><%= token.refresh_token %></pre>
 
   <form method="post" action="/oauth/disconnect">
     <div class="actions">
-      <button class="btn danger" type="submit">Disconnect</button>
+      <button class="btn danger" type="submit">Revoke and disconnect</button>
+      <span class="hint" style="margin: 0;">
+        Calls <code>POST <%= metadata.revocationEndpoint %></code> first, then drops the local copy.
+      </span>
     </div>
   </form>
 </div>

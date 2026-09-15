@@ -1,17 +1,22 @@
 // Logs every call this app makes to Luca, so you can watch the OAuth handshake
 // happen in your terminal:
 //
-//   → POST https://go.lucaregnskap.no/api/v1/oauth2/token
+//   → POST https://go.lucaregnskap.no/oauth/token
 //     grant_type=authorization_code  code=«redacted, 43 chars»  client_id=6d0f…
+//     code_verifier=«redacted, 43 chars»
 //   ← 200 in 412ms
-//     access_token=«redacted, 632 chars»  token_type=bearer  expires_in=3600
+//     access_token=«redacted, 43 chars»  token_type=Bearer  expires_in=3600
 //
 // Secrets are redacted and the GraphQL payload is summarised, so the logs are
 // safe to paste into a bug report.
 
 // `code` means different things in each direction: on the way out it is the
 // single-use authorization code, on the way back it is Luca's status number.
-const SENT_SECRETS = new Set(["client_secret", "code", "refresh_token"]);
+//
+// `code_verifier` is the secret half of PKCE and `token` is whatever is being
+// revoked. Deliberately *not* redacted: `state`, `code_challenge`, `scope` and
+// `iss` — watching those go out and come back is the demonstration.
+const SENT_SECRETS = new Set(["client_secret", "code", "code_verifier", "refresh_token", "token"]);
 const RECEIVED_SECRETS = new Set(["access_token", "refresh_token"]);
 
 // Not a secret, but not printable either: `data` is whatever you asked Luca
