@@ -34,6 +34,29 @@ export function credentialsFor(session) {
   };
 }
 
+// Where each value above actually came from. The Setup page shows this, because
+// otherwise "Forget" looks broken: it clears what you typed, the form falls
+// straight back to .env, and the same client ID is on screen a moment later.
+export function sourcesFor(session) {
+  const saved = session.credentials ?? {};
+  const from = (key) => (saved[key] !== undefined ? "form" : process.env[ENV_NAMES[key]] ? ".env" : "default");
+
+  return Object.fromEntries(Object.keys(ENV_NAMES).map((key) => [key, from(key)]));
+}
+
+const ENV_NAMES = {
+  host: "HOST",
+  clientId: "CLIENT_ID",
+  clientSecret: "CLIENT_SECRET",
+  scope: "SCOPE",
+};
+
+// Does .env have anything for the form to fall back to? Decides what the
+// Forget button can honestly promise.
+export function hasEnvCredentials() {
+  return Boolean(process.env.CLIENT_ID || process.env.CLIENT_SECRET);
+}
+
 // Must match a redirect URI registered on your Luca OAuth application — Luca
 // compares them character for character — so it is derived once here and used
 // by both /oauth/authorize and /oauth/callback.

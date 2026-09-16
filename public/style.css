@@ -113,6 +113,14 @@ pre {
 .flash.notice { border-color: color-mix(in srgb, var(--ok) 40%, transparent); background: color-mix(in srgb, var(--ok) 10%, transparent); color: var(--ok); }
 .flash.alert  { border-color: color-mix(in srgb, var(--err) 40%, transparent); background: color-mix(in srgb, var(--err) 10%, transparent); color: var(--err); }
 
+/* A public client has no secret, so the field is not merely optional — it is
+   not part of the conversation. Driven by the radio above it with :has(), so
+   the page still needs no JavaScript; a browser without :has() shows the field,
+   which is harmless because nothing reads it in that mode anyway. */
+.credentials:has(#clientType-public:checked) .field-secret { display: none; }
+
+.field .origin { grid-column: 2; margin: 6px 0 0; font-size: 13px; }
+
 .choice { display: block; font-size: 14px; margin: 0 0 6px; cursor: pointer; }
 .choice input { margin-right: 8px; }
 

@@ -3,6 +3,7 @@ import { Router } from "express";
 import * as luca from "../luca.js";
 import * as discovery from "../discovery.js";
 import * as schemas from "../schema.js";
+import { hasEnvCredentials } from "../config.js";
 import { notice } from "../flash.js";
 
 const router = Router();
@@ -78,7 +79,15 @@ router.post("/setup/forget", (req, res) => {
   delete req.session.token;
   delete req.session.pending;
 
-  notice(req, "Credentials and tokens forgotten.");
+  // Forget only clears what was typed into the form. Anything in .env is still
+  // there and the form falls straight back to it, so say so rather than letting
+  // the button look like it did nothing.
+  notice(
+    req,
+    hasEnvCredentials()
+      ? "Cleared what you typed, and dropped the tokens. The form has fallen back to the values in .env — edit that file to change those."
+      : "Credentials and tokens forgotten.",
+  );
   res.redirect("/setup");
 });
 

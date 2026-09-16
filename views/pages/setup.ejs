@@ -10,42 +10,57 @@
     never from your browser, and are kept in memory only — restarting the server forgets them.
   </p>
 
-  <form method="post" action="/setup">
+  <form method="post" action="/setup" class="credentials">
+    <div class="field">
+      <label>Client type</label>
+      <div>
+        <label class="choice">
+          <input type="radio" name="clientType" id="clientType-confidential" value="confidential"
+                 <%= publicClient ? "" : "checked" %>>
+          Confidential — has a client secret
+        </label>
+        <label class="choice">
+          <input type="radio" name="clientType" id="clientType-public" value="public"
+                 <%= publicClient ? "checked" : "" %>>
+          Public — no secret, PKCE only
+        </label>
+        <p class="hint" style="margin: 6px 0 0;">
+          Pick this first: it decides whether there is a secret to give at all. A public client still
+          sends its <strong>client ID</strong> — that is a public identifier, not a credential — but it
+          sends no secret, and PKCE is what proves the token exchange came from whoever started the
+          flow. A mobile or single-page app cannot keep a secret, so it registers as public.
+        </p>
+      </div>
+    </div>
+
     <div class="field">
       <label for="host">Host</label>
       <input id="host" name="host" value="<%= host %>" spellcheck="false">
+      <% if (sources.host === ".env") { %><p class="hint origin">from <code>.env</code></p><% } %>
     </div>
 
     <div class="field">
       <label for="clientId">Client ID</label>
       <input id="clientId" name="clientId" value="<%= credentials.clientId %>" spellcheck="false"
              autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000">
+      <% if (sources.clientId === ".env") { %><p class="hint origin">from <code>.env</code></p><% } %>
     </div>
 
-    <div class="field">
-      <label>Client type</label>
-      <div>
-        <label class="choice">
-          <input type="radio" name="clientType" value="confidential" <%= publicClient ? "" : "checked" %>>
-          Confidential — keeps a secret on a server
-        </label>
-        <label class="choice">
-          <input type="radio" name="clientType" value="public" <%= publicClient ? "checked" : "" %>>
-          Public — no secret, PKCE only
-        </label>
-        <p class="hint" style="margin: 6px 0 0;">
-          OAuth 2.1 allows a client with no secret at all: PKCE, not the secret, is what proves the
-          token exchange came from whoever started the flow. A mobile or single-page app cannot keep
-          a secret, so it registers as public.
-        </p>
-      </div>
-    </div>
-
-    <div class="field">
+    <%
+      // Hidden by CSS while "Public" is selected — see .credentials:has(...) in
+      // style.css. Pure CSS rather than script, because nothing else on this page
+      // needs JavaScript and a browser without :has() simply shows the field,
+      // which is harmless: a public client sends no secret either way.
+    %>
+    <div class="field field-secret">
       <label for="clientSecret">Client secret</label>
       <input id="clientSecret" name="clientSecret" type="password" spellcheck="false"
              autocomplete="off"
-             placeholder="<%= credentials.clientSecret ? "•".repeat(24) + " (saved)" : "public client — leave blank" %>">
+             placeholder="<%= credentials.clientSecret ? "•".repeat(24) + " (saved)" : "paste the secret Luca showed you once" %>">
+      <p class="hint origin">
+        <% if (sources.clientSecret === ".env") { %>from <code>.env</code> — <% } %>
+        Leave blank to keep the one already saved.
+      </p>
     </div>
 
     <div class="field">
