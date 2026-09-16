@@ -16,22 +16,42 @@ export const config = {
 const fromEnv = {
   host: process.env.HOST || DEFAULT_HOST,
   clientId: process.env.CLIENT_ID || "",
-  // Blank is a valid answer: an application registered as a public client has
-  // no secret, and PKCE is what proves the exchange came from whoever started
-  // the flow.
   clientSecret: process.env.CLIENT_SECRET || "",
   scope: process.env.SCOPE || DEFAULT_SCOPE,
+  // A secret in .env means a confidential application; none means a public one.
+  // Only a starting guess — the Setup page records the answer explicitly.
+  clientType: process.env.CLIENT_SECRET ? "confidential" : "public",
 };
 
 export function credentialsFor(session) {
   const saved = session.credentials ?? {};
+  const clientType = saved.clientType ?? fromEnv.clientType;
+  const stored = saved.clientSecret ?? fromEnv.clientSecret;
 
   return {
     host: saved.host ?? fromEnv.host,
     clientId: saved.clientId ?? fromEnv.clientId,
-    clientSecret: saved.clientSecret ?? fromEnv.clientSecret,
     scope: saved.scope ?? fromEnv.scope,
+    clientType,
+
+    // The client type is recorded rather than inferred from whether a secret is
+    // present, because those are not the same question. "Confidential, but the
+    // secret is missing" is a mistake worth catching; inferring would silently
+    // call it a public client and send no secret, and Luca would answer
+    // invalid_client with nothing pointing at the real cause.
+    //
+    // The stored secret survives a trip through public mode, so switching back
+    // does not mean pasting it again — it is simply not sent meanwhile.
+    clientSecret: clientType === "public" ? "" : stored,
+    hasStoredSecret: Boolean(stored),
   };
+}
+
+// A confidential client that has no secret to send cannot complete the
+// exchange, and it is the one combination the Setup page can produce by
+// accident — pick Public, save, then pick Confidential again.
+export function missingSecret(credentials) {
+  return credentials.clientType === "confidential" && !credentials.clientSecret;
 }
 
 // Where each value above actually came from. The Setup page shows this, because

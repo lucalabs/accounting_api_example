@@ -61,9 +61,13 @@
       <div>
         <input id="clientSecret" name="clientSecret" type="password" spellcheck="false"
                autocomplete="off"
-               placeholder="<%= credentials.clientSecret ? "•".repeat(24) + " (saved)" : "paste the secret Luca showed you once" %>">
+               placeholder="<%= credentials.hasStoredSecret ? "•".repeat(24) + " (saved)" : "paste the secret Luca showed you once" %>">
         <p class="hint origin">
-          <% if (sources.clientSecret === ".env") { %>from <code>.env</code>. <% } %>Leave blank to keep the one already saved.
+          <% if (credentials.hasStoredSecret) { %>
+            <% if (sources.clientSecret === ".env") { %>from <code>.env</code>. <% } %>A secret is stored — leave blank to keep it.
+          <% } else { %>
+            <strong>No secret stored.</strong> A confidential client cannot get a token without one.
+          <% } %>
         </p>
       </div>
     </div>

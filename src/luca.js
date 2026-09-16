@@ -319,7 +319,12 @@ async function tokenRequest(url, params) {
 
   if (response.status >= 400 || !body.access_token) {
     throw new LucaError(
-      tokenErrorMessage({ status: response.status, body, grantType: params.grant_type }),
+      tokenErrorMessage({
+        status: response.status,
+        body,
+        grantType: params.grant_type,
+        sentSecret: Boolean(params.client_secret),
+      }),
     );
   }
 
@@ -360,7 +365,7 @@ function formFor(params) {
 const TOKEN_HINTS = {
   invalid_client:
     "The client ID is unknown, or the secret is wrong. If this application is registered " +
-    "as a public client, leave the client secret blank on the Setup page.",
+    "as a public client, set Client type to Public on the Setup page.",
   invalid_scope:
     "The OAuth application in Luca is not registered for one of the scopes requested. " +
     "Change the scope on the Setup page, or add it to the application in Luca.",
@@ -377,9 +382,17 @@ const GRANT_HINTS = {
     "revokes the whole authorization. Connect again.",
 };
 
-function tokenErrorMessage({ status, body, grantType }) {
+function tokenErrorMessage({ status, body, grantType, sentSecret }) {
   const code = body.error ?? `HTTP ${status}`;
-  const hint = code === "invalid_grant" ? GRANT_HINTS[grantType] : TOKEN_HINTS[code];
+  // The two ways invalid_client happens point in opposite directions, and this
+  // client knows which one it is: it knows whether it sent a secret.
+  const hint =
+    code === "invalid_grant"
+      ? GRANT_HINTS[grantType]
+      : code === "invalid_client" && !sentSecret
+        ? "No client secret was sent. If this application is registered as confidential, " +
+          "set Client type to Confidential on the Setup page and paste its secret."
+        : TOKEN_HINTS[code];
   const parts = [`Token request failed (${code})`];
 
   if (body.error_description) parts.push(collapse(truncate(body.error_description, 300)));

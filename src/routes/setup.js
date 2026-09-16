@@ -3,8 +3,8 @@ import { Router } from "express";
 import * as luca from "../luca.js";
 import * as discovery from "../discovery.js";
 import * as schemas from "../schema.js";
-import { hasEnvCredentials } from "../config.js";
-import { notice } from "../flash.js";
+import { hasEnvCredentials, credentialsFor, missingSecret } from "../config.js";
+import { notice, alert } from "../flash.js";
 
 const router = Router();
 
@@ -35,16 +35,13 @@ router.post("/setup", (req, res) => {
   credentials.clientId = (req.body.clientId ?? "").trim();
   credentials.scope = SCOPE_CHOICES[req.body.scope] ?? luca.DEFAULT_SCOPE;
 
-  if (req.body.clientType === "public") {
-    // Stored as an empty string rather than deleted. Deleting would let the
-    // session fall back to CLIENT_SECRET from .env, and the next exchange would
-    // quietly be confidential again — an answer of "no secret" has to be
-    // recorded, not merely left blank.
-    credentials.clientSecret = "";
-  } else {
-    const secret = (req.body.clientSecret ?? "").trim();
-    if (secret) credentials.clientSecret = secret;
-  }
+  // The choice itself is what gets recorded. The secret is kept either way, so
+  // a trip through public mode does not throw it away — credentialsFor simply
+  // stops sending it while public is selected.
+  credentials.clientType = req.body.clientType === "public" ? "public" : "confidential";
+
+  const secret = (req.body.clientSecret ?? "").trim();
+  if (secret) credentials.clientSecret = secret;
 
   req.session.credentials = credentials;
 
@@ -64,11 +61,28 @@ router.post("/setup", (req, res) => {
     delete req.session.token;
     delete req.session.pending;
     schemas.forget(req.sessionID, luca.normalizeHost(before.host));
-
-    notice(req, "Credentials saved. The old token was dropped — connect again.");
-  } else {
-    notice(req, "Credentials saved for this session.");
   }
+
+  // Caught here rather than at the token endpoint: Luca would answer
+  // invalid_client, which is true but says nothing about which of the two
+  // fields on this page is wrong.
+  if (missingSecret(credentialsFor(req.session))) {
+    alert(
+      req,
+      "Saved — but a confidential client needs a client secret, and none is stored. " +
+        "Paste the one Luca showed you when the application was created, or switch " +
+        "Client type to Public if it was registered without a secret.",
+    );
+
+    return res.redirect("/setup");
+  }
+
+  notice(
+    req,
+    reissued && !req.session.token
+      ? "Credentials saved. The old token was dropped — connect again."
+      : "Credentials saved for this session.",
+  );
 
   res.redirect("/");
 });

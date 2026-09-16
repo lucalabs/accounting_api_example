@@ -62,7 +62,7 @@ app.use((req, res, next) => {
   // What Luca actually granted, read from the token response rather than from
   // the callback — it can come back narrower than what was asked for.
   res.locals.grantedScope = req.session.token?.scope ?? null;
-  res.locals.publicClient = !req.credentials.clientSecret;
+  res.locals.publicClient = req.credentials.clientType === "public";
   // Filled in by the routes that show it. Discovery is a network call, so it
   // does not belong on every request — /health included.
   res.locals.metadata = null;
