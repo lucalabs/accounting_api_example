@@ -119,10 +119,15 @@ pre {
    which is harmless because nothing reads it in that mode anyway. */
 .credentials:has(#clientType-public:checked) .field-secret { display: none; }
 
-.field .origin { grid-column: 2; margin: 6px 0 0; font-size: 13px; }
+.field .origin { margin: 6px 0 0; font-size: 13px; }
 
-.choice { display: block; font-size: 14px; margin: 0 0 6px; cursor: pointer; }
-.choice input { margin-right: 8px; }
+.choice { display: flex; align-items: baseline; gap: 8px; font-size: 14px; margin: 0 0 6px; cursor: pointer; color: var(--text); }
+.choice input { flex: none; width: auto; margin: 0; }
+
+/* A field whose control is a stack of choices is tall, so its label belongs
+   beside the first one rather than centred against the whole block. */
+.field:has(.choice) { align-items: start; }
+.field:has(.choice) > label { padding-top: 0; }
 
 .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; }
 .pill.on { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
@@ -155,10 +160,15 @@ details + details { border-top: 1px solid var(--line); }
 
 .muted { color: var(--muted); font-size: 14px; }
 
-.field { display: grid; grid-template-columns: 170px 1fr; gap: 16px; align-items: center; margin-bottom: 10px; }
+/* Top-aligned rather than centred: a cell can be an input plus a hint, or a
+   stack of radios, and a label centred against all of that drifts away from the
+   control it names. The padding lines it up with the first line of text inside
+   the input. */
+.field { display: grid; grid-template-columns: 170px 1fr; gap: 16px; align-items: start; margin-bottom: 14px; }
 .field label { color: var(--muted); font-size: 14px; }
+.field > label { padding-top: 10px; }
 
-input, textarea {
+input:not([type="radio"]):not([type="checkbox"]), textarea {
   width: 100%;
   background: var(--panel-2);
   border: 1px solid var(--line);

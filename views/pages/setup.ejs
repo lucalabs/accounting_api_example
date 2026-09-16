@@ -35,15 +35,19 @@
 
     <div class="field">
       <label for="host">Host</label>
-      <input id="host" name="host" value="<%= host %>" spellcheck="false">
-      <% if (sources.host === ".env") { %><p class="hint origin">from <code>.env</code></p><% } %>
+      <div>
+        <input id="host" name="host" value="<%= host %>" spellcheck="false">
+        <% if (sources.host === ".env") { %><p class="hint origin">from <code>.env</code></p><% } %>
+      </div>
     </div>
 
     <div class="field">
       <label for="clientId">Client ID</label>
-      <input id="clientId" name="clientId" value="<%= credentials.clientId %>" spellcheck="false"
-             autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000">
-      <% if (sources.clientId === ".env") { %><p class="hint origin">from <code>.env</code></p><% } %>
+      <div>
+        <input id="clientId" name="clientId" value="<%= credentials.clientId %>" spellcheck="false"
+               autocomplete="off" placeholder="00000000-0000-0000-0000-000000000000">
+        <% if (sources.clientId === ".env") { %><p class="hint origin">from <code>.env</code></p><% } %>
+      </div>
     </div>
 
     <%
@@ -54,13 +58,14 @@
     %>
     <div class="field field-secret">
       <label for="clientSecret">Client secret</label>
-      <input id="clientSecret" name="clientSecret" type="password" spellcheck="false"
-             autocomplete="off"
-             placeholder="<%= credentials.clientSecret ? "•".repeat(24) + " (saved)" : "paste the secret Luca showed you once" %>">
-      <p class="hint origin">
-        <% if (sources.clientSecret === ".env") { %>from <code>.env</code> — <% } %>
-        Leave blank to keep the one already saved.
-      </p>
+      <div>
+        <input id="clientSecret" name="clientSecret" type="password" spellcheck="false"
+               autocomplete="off"
+               placeholder="<%= credentials.clientSecret ? "•".repeat(24) + " (saved)" : "paste the secret Luca showed you once" %>">
+        <p class="hint origin">
+          <% if (sources.clientSecret === ".env") { %>from <code>.env</code>. <% } %>Leave blank to keep the one already saved.
+        </p>
+      </div>
     </div>
 
     <div class="field">
