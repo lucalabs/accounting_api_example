@@ -57,7 +57,11 @@ router.post("/setup", (req, res) => {
     discovery.forget(before.host);
   }
 
-  if (reissued && req.session.token) {
+  // `reissued` alone is not enough for the message below: on a first-time save
+  // it is true too, and there is no token to drop.
+  const dropped = reissued && Boolean(req.session.token);
+
+  if (dropped) {
     delete req.session.token;
     delete req.session.pending;
     schemas.forget(req.sessionID, luca.normalizeHost(before.host));
@@ -79,7 +83,7 @@ router.post("/setup", (req, res) => {
 
   notice(
     req,
-    reissued && !req.session.token
+    dropped
       ? "Credentials saved. The old token was dropped — connect again."
       : "Credentials saved for this session.",
   );

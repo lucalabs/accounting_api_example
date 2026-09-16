@@ -55,7 +55,7 @@ function startingVariables(req, state, chosen, companyId) {
 // into the page so a large schema is fetched once, in the background, and the
 // editor keeps working if it never arrives.
 router.get("/api/schema.json", requireToken, async (req, res) => {
-  const { schema, schemaError } = await load(req, { companies: false });
+  const { schema, schemaError } = await load(req, { companies: false, resource: false });
 
   if (!schema) return res.status(502).json({ error: schemaError });
 
@@ -127,7 +127,7 @@ router.post("/api/query", requireToken, async (req, res) => {
 
 // Introspection and the company list both need a working token, so a failure
 // in either is shown on the page rather than thrown.
-async function load(req, { companies = true } = {}) {
+async function load(req, { companies = true, resource: wantResource = true } = {}) {
   const host = luca.normalizeHost(req.credentials.host);
   const search = req.query.q ?? req.body?.q ?? "";
   const wanted = req.query.company ?? req.body?.company ?? "";
@@ -142,7 +142,7 @@ async function load(req, { companies = true } = {}) {
     companies
       ? attempt(schemas.loadCompanies({ sessionId: req.sessionID, host, accessToken }))
       : [[], null],
-    discovery.discoverResource(host),
+    wantResource ? discovery.discoverResource(host) : null,
   ]);
 
   return {

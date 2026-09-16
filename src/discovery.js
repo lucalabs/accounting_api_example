@@ -33,6 +33,14 @@ export const DEFAULT_PATHS = {
 // every visitor to a host.
 const cache = new Map();
 const inflight = new Map();
+
+// The resource document gets the same treatment, keyed by the address it was
+// read from — usually {host}/.well-known/oauth-protected-resource, but a 401's
+// WWW-Authenticate challenge can name another. It sits on the API page's hot
+// path, so without a cache every query would re-fetch it.
+const resourceCache = new Map();
+const resourceInflight = new Map();
+
 const MAX_ENTRIES = 20;
 
 const TTL_MS = 10 * 60_000;
@@ -41,7 +49,13 @@ const TTL_MS = 10 * 60_000;
 const FALLBACK_TTL_MS = 30_000;
 
 export function forget(host) {
-  cache.delete(luca.normalizeHost(host));
+  const key = luca.normalizeHost(host);
+
+  cache.delete(key);
+
+  for (const address of resourceCache.keys()) {
+    if (origin(address) === origin(key)) resourceCache.delete(address);
+  }
 }
 
 // For templates, which cannot await. Returns whatever is already known.
@@ -72,15 +86,15 @@ async function read(key) {
     metadata = fallbackFor(key, luca.describeError(error));
   }
 
-  remember(key, metadata);
+  remember(cache, key, metadata);
 
   return metadata;
 }
 
-function remember(key, metadata) {
-  cache.set(key, metadata);
+function remember(map, key, value) {
+  map.set(key, value);
 
-  if (cache.size > MAX_ENTRIES) cache.delete(cache.keys().next().value);
+  if (map.size > MAX_ENTRIES) map.delete(map.keys().next().value);
 }
 
 function expired({ fetchedAt, source }) {
@@ -188,12 +202,41 @@ function fallbackFor(key, error) {
 // meet the API cold, be refused, and learn from the refusal alone which
 // authorization server to go to. That is how an MCP client bootstraps.
 //
-// Returns null rather than throwing — nothing here is load-bearing; it makes
-// the request bar honest and gives a 401 something useful to say.
+// Returns an error field rather than throwing — nothing here is load-bearing;
+// it makes the request bar honest and gives a 401 something useful to say.
+// Cached like the authorization server metadata above, and for the same
+// reason: the document is public and identical for every visitor, and this
+// one is read on every API page render.
 export async function discoverResource(host, url) {
   const key = luca.normalizeHost(host);
   const address = url ?? `${key}${RESOURCE_PATH}`;
 
+  const known = resourceCache.get(address);
+  if (known && !resourceExpired(known)) return known;
+
+  if (resourceInflight.has(address)) return resourceInflight.get(address);
+
+  const pending = readResource(key, address).finally(() => resourceInflight.delete(address));
+  resourceInflight.set(address, pending);
+
+  return pending;
+}
+
+async function readResource(key, address) {
+  const description = await describeResource(key, address);
+
+  remember(resourceCache, address, description);
+
+  return description;
+}
+
+// A failed read is remembered too, briefly — see FALLBACK_TTL_MS above — so an
+// unreachable document costs one slow request, not one per page render.
+function resourceExpired({ fetchedAt, error }) {
+  return Date.now() - fetchedAt > (error ? FALLBACK_TTL_MS : TTL_MS);
+}
+
+async function describeResource(key, address) {
   try {
     const doc = await luca.protectedResourceMetadata(address);
     const servers = doc.authorization_servers ?? [];
@@ -213,9 +256,11 @@ export async function discoverResource(host, url) {
       scopesSupported: doc.scopes_supported ?? [],
       resourceDocumentation: doc.resource_documentation ?? null,
       error: null,
+      fetchedAt: Date.now(),
     };
   } catch (error) {
     return { resource: null, authorizationServers: [], scopesSupported: [],
-             resourceDocumentation: null, error: luca.describeError(error) };
+             resourceDocumentation: null, error: luca.describeError(error),
+             fetchedAt: Date.now() };
   }
 }
