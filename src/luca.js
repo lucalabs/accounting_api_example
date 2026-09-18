@@ -246,67 +246,100 @@ export function headersFor(accessToken) {
 // the one thing worth doing about it. Everything here is specific to Luca's
 // rules rather than to GraphQL, which is why it lives in this file.
 //
-// Two awkward facts shape this, and both are worth knowing before you copy it:
-//
-//   1. These arrive as ordinary GraphQL field errors with no `extensions.code`,
-//      so the human-readable message is the only thing to match on.
-//   2. That message is translated into the *resource owner's* language — the
-//      language of the Luca user who granted the token, which the client does
-//      not choose and cannot change with Accept-Language or ?locale=. So a
-//      Norwegian user's token yields Norwegian errors even to an integration
-//      that only speaks English.
-//
-// Hence a phrase from each language per case. Matching on server prose is a bad
-// habit; if these ever grow a machine-readable code, match on that instead and
-// delete the patterns.
+// Every error carries `extensions.code`, and the code is the thing to branch
+// on. There are nine, and they are coarse on purpose: a code names what an
+// integration should *do* about a failure — back off, re-authorize, fix the
+// query — rather than what went wrong. So one code covers several causes, and
+// the `message` beside it is what says which. Show that message; never match on
+// it. The four codes missing from this table — UNAUTHENTICATED, handled above,
+// plus NOT_FOUND, TIMEOUT and INTERNAL_SERVER_ERROR — have no advice worth
+// adding to what the message already says.
 const REFUSALS = [
   {
-    // "companyId is required: …" / "companyId er påkrevd: …"
-    pattern: /companyId (is required|er påkrevd)/i,
-    say:
-      "Every query and mutation has to name the company it is about. Pick one in " +
-      "the sidebar and press Try it again, or add `companyId:` to the field yourself.",
+    // The only entry that stops the whole request rather than one field, which
+    // is why it comes first: nothing else in the document ran either.
+    code: "RATE_LIMITED",
+    say: ({ retryAfter }) =>
+      retryAfter
+        ? `Too many requests. Wait ${retryAfter} seconds before trying again, and back ` +
+          "off rather than retrying in a loop."
+        : "Too many requests. Wait a little before trying again.",
   },
   {
-    // "companyId X is not one of: …" / "companyId X er ikke ett av: …"
-    pattern: /companyId \S+ (is not one of|er ikke ett av)/i,
+    // Four different refusals share this code — the company is not on the
+    // consent, it is not the one an API key is bound to, the record belongs to
+    // someone else, or the token may not write. Only the message tells them
+    // apart, so the advice has to cover the two an integration can act on.
+    code: "FORBIDDEN",
     say:
-      "That company is outside what this token was granted. Connect again and tick " +
-      "it on Luca's consent screen — the message above lists the ones it may name.",
+      "This token's consent does not reach that far: either the company is outside what " +
+      `was granted, or the token is ${SCOPES.read} only and that was a mutation. The ` +
+      "message above says which. Connect again and tick the company on Luca's consent " +
+      "screen, or change the scope on the Setup page.",
   },
   {
-    // "This access token may only read…" / "Denne tilgangsnøkkelen kan bare lese…"
-    pattern: /(may only read|kan bare lese)/i,
+    code: "PLAN_REQUIRED",
     say:
-      `This token was granted ${SCOPES.read} only. Change the scope on the Setup ` +
-      "page and connect again to run mutations.",
+      "The company's Luca plan does not cover this part of the API. The message above " +
+      "names what it needs; adding it is the account owner's call, not this " +
+      "integration's.",
+  },
+  {
+    // `company_id_required` lands here alongside a misspelt field, a document
+    // that will not parse and one nested too deep — all of them "the query is
+    // wrong and sending it again unchanged will not help".
+    code: "BAD_REQUEST",
+    say:
+      "The document itself is wrong. Most often that is a field with no `companyId` — " +
+      "pick a company in the sidebar and press Try it again — but a misspelt field or a " +
+      "query that will not parse arrives the same way. The message above says which.",
+  },
+  {
+    // The second entry to read past the code: a VALIDATION_FAILED always
+    // carries `details`, one entry per failure, naming the field it is about
+    // wherever there is one worth naming.
+    code: "VALIDATION_FAILED",
+    say: ({ details }) => {
+      const fields = [...new Set((details ?? []).map(({ field }) => field).filter(Boolean))];
+
+      return fields.length
+        ? `Luca refused the values rather than the query — ${fields.join(", ")}. The message ` +
+          "above says what each one expected."
+        : "Luca refused the values rather than the query. The message above says what it expected.";
+    },
   },
 ];
 
 export function explain({ status, body }) {
-  if (status === 401 || errorCode(body) === "UNAUTHENTICATED") {
+  const codes = errorCodes(body);
+
+  if (status === 401 || codes.includes("UNAUTHENTICATED")) {
     return (
       "The access token was refused. It may have expired, been revoked, or been " +
       "invalidated by a refresh token replay — connect again to get a new one."
     );
   }
 
-  const message = errorMessages(body).join(" ");
+  // The order of REFUSALS decides which hint wins, not the order the errors
+  // happened to arrive in.
+  const refusal = REFUSALS.find(({ code }) => codes.includes(code));
 
-  return REFUSALS.find(({ pattern }) => pattern.test(message))?.say ?? null;
+  if (!refusal) return null;
+
+  return typeof refusal.say === "function"
+    ? refusal.say(extensionsFor(body, refusal.code))
+    : refusal.say;
 }
 
-// Two shapes, for now. The GraphQL one is what the API is converging on;
-// IN-11977 tracks the last few places that still answer with a bare
-// `{ "error": … }`, and this branch can go when it lands.
-function errorMessages(body) {
-  if (typeof body?.error === "string") return [body.error];
-
-  return (body?.errors ?? []).map((error) => error?.message ?? "").filter(Boolean);
+// Every code in the document, because one document can carry several: name two
+// companies in one query and get one of them wrong, and the refusal arrives
+// beside the half that resolved perfectly well.
+function errorCodes(body) {
+  return (body?.errors ?? []).map((error) => error?.extensions?.code).filter(Boolean);
 }
 
-function errorCode(body) {
-  return body?.errors?.find((error) => error?.extensions?.code)?.extensions?.code ?? null;
+function extensionsFor(body, code) {
+  return body?.errors?.find((error) => error?.extensions?.code === code)?.extensions ?? {};
 }
 
 async function tokenRequest(url, params) {

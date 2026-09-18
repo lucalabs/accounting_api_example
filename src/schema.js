@@ -87,7 +87,7 @@ export async function load({ sessionId, host, accessToken }) {
 
   const { status, body } = await graphql({ host, accessToken, query: INTROSPECTION_QUERY });
 
-  if (body.errors || body.error) throw refusal(status, body, "Introspection was refused by the API.");
+  if (body.errors) throw refusal(status, body, "Introspection was refused by the API.");
 
   const schema = summarize(body.data.__schema);
   remember(key, schema);
@@ -103,7 +103,7 @@ export async function loadCompanies({ sessionId, host, accessToken }) {
 
   const { status, body } = await graphql({ host, accessToken, query: COMPANIES_QUERY });
 
-  if (body.errors || body.error) throw refusal(status, body, "The API refused to list companies.");
+  if (body.errors) throw refusal(status, body, "The API refused to list companies.");
 
   const companies = body.data?.companies?.nodes ?? [];
   remember(key, companies);
@@ -116,7 +116,7 @@ export async function loadCompanies({ sessionId, host, accessToken }) {
 function refusal(status, body, fallback) {
   const [first] = body.errors ?? [];
 
-  return new Error(explain({ status, body }) ?? first?.message ?? body.error ?? fallback);
+  return new Error(explain({ status, body }) ?? first?.message ?? fallback);
 }
 
 function remember(key, schema) {
