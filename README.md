@@ -222,11 +222,14 @@ is enough for ordinary queries and gives up on fragments, directives and inline 
   refresh *and* the revocation. Sending only `client_id` to `/oauth/token` answers
   `401 invalid_client`, and to `/oauth/revoke` answers `403` while leaving the token alive.
 - **Every query and mutation needs a `companyId`** except `companies` and `company(id:)`.
-- **The field errors are not machine-readable.** `companyId is required`, `is not one of` and the
-  read-only refusal arrive as plain GraphQL field errors with no `extensions.code`, *and* they are
-  translated into the language of the Luca user who granted the token — which the client does not
-  choose. `src/luca.js` matches a phrase from each language in `explain`, and says why that is a bad
-  habit worth replacing the moment there is a code to match on.
+- **The field errors are machine-readable.** Every error carries `extensions.code`, one of nine:
+  `UNAUTHENTICATED`, `FORBIDDEN`, `RATE_LIMITED`, `BAD_REQUEST`, `NOT_FOUND`, `VALIDATION_FAILED`,
+  `PLAN_REQUIRED`, `TIMEOUT`, `INTERNAL_SERVER_ERROR`. They are coarse on purpose — a code names
+  what your integration should *do* about a failure rather than what went wrong — so one code
+  covers several causes and the English `message` beside it says which. Branch on the code, show
+  the message, never match on it. Two codes carry more than the code: `RATE_LIMITED` has
+  `extensions.retryAfter` in seconds, and a `VALIDATION_FAILED` always has `extensions.details`,
+  an entry per rejected field. `src/luca.js` does all of this in `explain`.
 - **Ask for `Accept: application/json`.** Without it `POST /api/v1/graphql` labels its JSON body
   `Content-Type: text/html`.
 

@@ -94,7 +94,7 @@ router.post("/api/query", requireToken, async (req, res) => {
     // perfectly good data: name two companies in one document and get one
     // wrong, and the good half still resolves. That is the model working, not
     // a malfunction — so it is labelled apart from an outright failure.
-    const failed = Boolean(body.errors || body.error);
+    const failed = Boolean(body.errors);
     const ok = status < 400 && !failed;
     const partial = failed && Boolean(body.data);
 
